@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2024, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ * Copyright (c) 2024, WSO2 LLC. (http://www.wso2.org) All Rights Reserved.
  *
- * WSO2 Inc. licenses this file to you under the Apache License,
+ * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License.
  * You may obtain a copy of the License at
@@ -18,7 +18,6 @@
 
 package org.wso2.carbon.module.pdf;
 
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.synapse.MessageContext;
 import org.apache.synapse.mediators.AbstractMediator;
 import org.wso2.carbon.connector.core.ConnectException;
@@ -31,7 +30,6 @@ import java.util.Base64;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
-import org.apache.pdfbox.pdmodel.common.PDRectangle;
 
 public class WriteText extends AbstractMediator {
 
@@ -39,11 +37,23 @@ public class WriteText extends AbstractMediator {
     public boolean mediate(MessageContext messageContext) {
         String content;
         String propertyName;
+        String pageSize;
+        int textStartAtX;
+        int textStartAtY;
+        String font;
+        int fontSize;
         try {
             content = PDFUtils.lookUpStringParam(messageContext, PDFConstants.CONTENT_PARAM);
-            byte[] decodedBytes  = Base64.getDecoder().decode(content);
             propertyName = PDFUtils.lookUpStringParam(messageContext, PDFConstants.RESULT_PROPERTY_NAME_PARAM);
-            byte[] pdfBytes = writeFile(new String(decodedBytes));
+            pageSize  = PDFUtils.lookUpStringParam(messageContext, PDFConstants.PAGE_SIZE, PDFConstants.DEFAULT_PAGE_SIZE);
+            textStartAtX  = PDFUtils.lookUpIntegerParam(messageContext, PDFConstants.TEXT_STARTS_AT_X,
+                    PDFConstants.DEFAULT_TEXT_STARTS_AT_X);
+            textStartAtY  = PDFUtils.lookUpIntegerParam(messageContext, PDFConstants.TEXT_STARTS_AT_Y,
+                    PDFConstants.DEFAULT_TEXT_STARTS_AT_Y);
+            font  = PDFUtils.lookUpStringParam(messageContext, PDFConstants.FONT, PDFConstants.DEFAULT_FONT);
+            fontSize  = PDFUtils.lookUpIntegerParam(messageContext, PDFConstants.FONT_SIZE,
+                    PDFConstants.DEFAULT_FONT_SIZE);
+            byte[] pdfBytes = writeFile(content, pageSize, textStartAtX, textStartAtY, font, fontSize);
             byte[] encodedContent  = Base64.getEncoder().encode(pdfBytes);
             messageContext.setProperty(propertyName, new String(encodedContent));
         } catch (ConnectException | IOException e) {
@@ -53,11 +63,12 @@ public class WriteText extends AbstractMediator {
         return true;
     }
 
-    private byte[] writeFile(String content) throws IOException {
+    private byte[] writeFile(String content, String pageSize, int textStartAtX, int textStartAtY, String font,
+                             int fontSize) throws IOException {
         PDDocument document = new PDDocument();
 
         // Add a page to the document
-        PDPage page = new PDPage(PDRectangle.A4);
+        PDPage page = PDFUtils.createPDPage(pageSize);
         document.addPage(page);
 
         // Create a content stream for the page
@@ -65,9 +76,8 @@ public class WriteText extends AbstractMediator {
 
         // Add content to the page
         contentStream.beginText();
-        //contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 12);
-        contentStream.newLineAtOffset(100, 700);
-        contentStream.setFont(PDType1Font.HELVETICA_BOLD, 12);
+        contentStream.newLineAtOffset(textStartAtX, textStartAtY);
+        PDFUtils.setFont(contentStream, font, fontSize);
         contentStream.showText(content);
         contentStream.endText();
 

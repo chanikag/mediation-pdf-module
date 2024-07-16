@@ -5,3 +5,4 @@
         <class name="org.wso2.carbon.module.pdf.ConvertTIFFToPDF" />
     </sequence>
 </template>
+
